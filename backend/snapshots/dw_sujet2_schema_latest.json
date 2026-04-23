@@ -1,0 +1,1402 @@
+{
+  "database_name": "AdventureWorks_DW_Sujet2_V1",
+  "schema": "dbo",
+  "ssas_dimensions": {},
+  "tables": [
+    {
+      "name": "DimDate",
+      "schema_name": "dbo",
+      "columns": [
+        {
+          "name": "DateKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": true,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "FullDate",
+          "data_type": "date",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "DayNumber",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "MonthNumber",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "MonthName",
+          "data_type": "nvarchar",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "QuarterNumber",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "YearNumber",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "WeekDayNumber",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "WeekDayName",
+          "data_type": "nvarchar",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        }
+      ]
+    },
+    {
+      "name": "DimProduct",
+      "schema_name": "dbo",
+      "columns": [
+        {
+          "name": "ProductKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": true,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ProductID",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ProductName",
+          "data_type": "nvarchar",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ProductNumber",
+          "data_type": "nvarchar",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "MakeFlag",
+          "data_type": "bit",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "FinishedGoodsFlag",
+          "data_type": "bit",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "SafetyStockLevel",
+          "data_type": "smallint",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ReorderPoint",
+          "data_type": "smallint",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "StandardCost",
+          "data_type": "money",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ListPrice",
+          "data_type": "money",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "DaysToManufacture",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        }
+      ]
+    },
+    {
+      "name": "DimPurchaseOrder",
+      "schema_name": "dbo",
+      "columns": [
+        {
+          "name": "PurchaseOrderKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": true,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "PurchaseOrderID",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "RevisionNumber",
+          "data_type": "tinyint",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "Status",
+          "data_type": "tinyint",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "EmployeeID",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "VendorID",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ShipMethodID",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "OrderDate",
+          "data_type": "datetime",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ShipDate",
+          "data_type": "datetime",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "SubTotal",
+          "data_type": "money",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "TaxAmt",
+          "data_type": "money",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "Freight",
+          "data_type": "money",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "TotalDue",
+          "data_type": "money",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        }
+      ]
+    },
+    {
+      "name": "DimVendor",
+      "schema_name": "dbo",
+      "columns": [
+        {
+          "name": "VendorKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": true,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "VendorID",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "AccountNumber",
+          "data_type": "nvarchar",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "VendorName",
+          "data_type": "nvarchar",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "CreditRating",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "PreferredVendorStatus",
+          "data_type": "bit",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ActiveFlag",
+          "data_type": "bit",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        }
+      ]
+    },
+    {
+      "name": "DimWorkOrder",
+      "schema_name": "dbo",
+      "columns": [
+        {
+          "name": "WorkOrderKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": true,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "WorkOrderID",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ProductID",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "StartDate",
+          "data_type": "datetime",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "EndDate",
+          "data_type": "datetime",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "DueDate",
+          "data_type": "datetime",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "OrderQty",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ScrappedQty",
+          "data_type": "smallint",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ScrapReasonID",
+          "data_type": "smallint",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        }
+      ]
+    },
+    {
+      "name": "FactInventoryMovement",
+      "schema_name": "dbo",
+      "columns": [
+        {
+          "name": "InventoryMovementKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": true,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ProductKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimProduct",
+          "references_column": "ProductKey"
+        },
+        {
+          "name": "TransactionDateKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimDate",
+          "references_column": "DateKey"
+        },
+        {
+          "name": "ReferenceOrderID",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ReferenceOrderLineID",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "TransactionType",
+          "data_type": "nvarchar",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "Quantity",
+          "data_type": "decimal",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ActualCost",
+          "data_type": "money",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "MovementDirection",
+          "data_type": "nvarchar",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "MovementCount",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "TotalMovementCost",
+          "data_type": "money",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        }
+      ]
+    },
+    {
+      "name": "FactProductionImpact",
+      "schema_name": "dbo",
+      "columns": [
+        {
+          "name": "ProductionImpactKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": true,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "WorkOrderKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimWorkOrder",
+          "references_column": "WorkOrderKey"
+        },
+        {
+          "name": "ProductKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimProduct",
+          "references_column": "ProductKey"
+        },
+        {
+          "name": "StartDateKey",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimDate",
+          "references_column": "DateKey"
+        },
+        {
+          "name": "EndDateKey",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimDate",
+          "references_column": "DateKey"
+        },
+        {
+          "name": "DueDateKey",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimDate",
+          "references_column": "DateKey"
+        },
+        {
+          "name": "OrderQty",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ScrappedQty",
+          "data_type": "smallint",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ScrapRate",
+          "data_type": "decimal",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "RiskFlag",
+          "data_type": "bit",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        }
+      ]
+    },
+    {
+      "name": "FactSupplyRisk",
+      "schema_name": "dbo",
+      "columns": [
+        {
+          "name": "SupplyRiskKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": true,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "PurchaseOrderKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimPurchaseOrder",
+          "references_column": "PurchaseOrderKey"
+        },
+        {
+          "name": "VendorKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimVendor",
+          "references_column": "VendorKey"
+        },
+        {
+          "name": "ProductKey",
+          "data_type": "int",
+          "nullable": false,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimProduct",
+          "references_column": "ProductKey"
+        },
+        {
+          "name": "OrderDateKey",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimDate",
+          "references_column": "DateKey"
+        },
+        {
+          "name": "DueDateKey",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimDate",
+          "references_column": "DateKey"
+        },
+        {
+          "name": "ShipDateKey",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": true,
+          "references_table": "DimDate",
+          "references_column": "DateKey"
+        },
+        {
+          "name": "OrderQty",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "ReceivedQty",
+          "data_type": "decimal",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "RejectedQty",
+          "data_type": "decimal",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "StockedQty",
+          "data_type": "decimal",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "UnitPrice",
+          "data_type": "money",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "LineAmount",
+          "data_type": "money",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "DelayDays",
+          "data_type": "int",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        },
+        {
+          "name": "LateFlag",
+          "data_type": "bit",
+          "nullable": true,
+          "is_pk": false,
+          "is_fk": false,
+          "references_table": null,
+          "references_column": null
+        }
+      ]
+    }
+  ],
+  "dimensions": [
+    {
+      "name": "DimDate",
+      "source_table": "DimDate",
+      "key_attribute": "DateKey",
+      "unique_name": "[DimDate]",
+      "attributes": [
+        {
+          "name": "DateKey",
+          "mdx_name": "Date Key",
+          "unique_name": "[DimDate].[Date Key]",
+          "sql_type": "int"
+        },
+        {
+          "name": "FullDate",
+          "mdx_name": "Full Date",
+          "unique_name": "[DimDate].[Full Date]",
+          "sql_type": "date"
+        },
+        {
+          "name": "DayNumber",
+          "mdx_name": "Day Number",
+          "unique_name": "[DimDate].[Day Number]",
+          "sql_type": "int"
+        },
+        {
+          "name": "MonthNumber",
+          "mdx_name": "Month Number",
+          "unique_name": "[DimDate].[Month Number]",
+          "sql_type": "int"
+        },
+        {
+          "name": "MonthName",
+          "mdx_name": "Month Name",
+          "unique_name": "[DimDate].[Month Name]",
+          "sql_type": "nvarchar"
+        },
+        {
+          "name": "QuarterNumber",
+          "mdx_name": "Quarter Number",
+          "unique_name": "[DimDate].[Quarter Number]",
+          "sql_type": "int"
+        },
+        {
+          "name": "YearNumber",
+          "mdx_name": "Year Number",
+          "unique_name": "[DimDate].[Year Number]",
+          "sql_type": "int"
+        },
+        {
+          "name": "WeekDayNumber",
+          "mdx_name": "Week Day Number",
+          "unique_name": "[DimDate].[Week Day Number]",
+          "sql_type": "int"
+        },
+        {
+          "name": "WeekDayName",
+          "mdx_name": "Week Day Name",
+          "unique_name": "[DimDate].[Week Day Name]",
+          "sql_type": "nvarchar"
+        }
+      ],
+      "hierarchies": []
+    },
+    {
+      "name": "DimProduct",
+      "source_table": "DimProduct",
+      "key_attribute": "ProductKey",
+      "unique_name": "[DimProduct]",
+      "attributes": [
+        {
+          "name": "ProductKey",
+          "mdx_name": "Product Key",
+          "unique_name": "[DimProduct].[Product Key]",
+          "sql_type": "int"
+        },
+        {
+          "name": "ProductID",
+          "mdx_name": "Product ID",
+          "unique_name": "[DimProduct].[Product ID]",
+          "sql_type": "int"
+        },
+        {
+          "name": "ProductName",
+          "mdx_name": "Product Name",
+          "unique_name": "[DimProduct].[Product Name]",
+          "sql_type": "nvarchar"
+        },
+        {
+          "name": "ProductNumber",
+          "mdx_name": "Product Number",
+          "unique_name": "[DimProduct].[Product Number]",
+          "sql_type": "nvarchar"
+        },
+        {
+          "name": "MakeFlag",
+          "mdx_name": "Make Flag",
+          "unique_name": "[DimProduct].[Make Flag]",
+          "sql_type": "bit"
+        },
+        {
+          "name": "FinishedGoodsFlag",
+          "mdx_name": "Finished Goods Flag",
+          "unique_name": "[DimProduct].[Finished Goods Flag]",
+          "sql_type": "bit"
+        },
+        {
+          "name": "SafetyStockLevel",
+          "mdx_name": "Safety Stock Level",
+          "unique_name": "[DimProduct].[Safety Stock Level]",
+          "sql_type": "smallint"
+        },
+        {
+          "name": "ReorderPoint",
+          "mdx_name": "Reorder Point",
+          "unique_name": "[DimProduct].[Reorder Point]",
+          "sql_type": "smallint"
+        },
+        {
+          "name": "StandardCost",
+          "mdx_name": "Standard Cost",
+          "unique_name": "[DimProduct].[Standard Cost]",
+          "sql_type": "money"
+        },
+        {
+          "name": "ListPrice",
+          "mdx_name": "List Price",
+          "unique_name": "[DimProduct].[List Price]",
+          "sql_type": "money"
+        },
+        {
+          "name": "DaysToManufacture",
+          "mdx_name": "Days To Manufacture",
+          "unique_name": "[DimProduct].[Days To Manufacture]",
+          "sql_type": "int"
+        }
+      ],
+      "hierarchies": []
+    },
+    {
+      "name": "DimPurchaseOrder",
+      "source_table": "DimPurchaseOrder",
+      "key_attribute": "PurchaseOrderKey",
+      "unique_name": "[DimPurchaseOrder]",
+      "attributes": [
+        {
+          "name": "PurchaseOrderKey",
+          "mdx_name": "Purchase Order Key",
+          "unique_name": "[DimPurchaseOrder].[Purchase Order Key]",
+          "sql_type": "int"
+        },
+        {
+          "name": "PurchaseOrderID",
+          "mdx_name": "Purchase Order ID",
+          "unique_name": "[DimPurchaseOrder].[Purchase Order ID]",
+          "sql_type": "int"
+        },
+        {
+          "name": "RevisionNumber",
+          "mdx_name": "Revision Number",
+          "unique_name": "[DimPurchaseOrder].[Revision Number]",
+          "sql_type": "tinyint"
+        },
+        {
+          "name": "Status",
+          "mdx_name": "Status",
+          "unique_name": "[DimPurchaseOrder].[Status]",
+          "sql_type": "tinyint"
+        },
+        {
+          "name": "EmployeeID",
+          "mdx_name": "Employee ID",
+          "unique_name": "[DimPurchaseOrder].[Employee ID]",
+          "sql_type": "int"
+        },
+        {
+          "name": "VendorID",
+          "mdx_name": "Vendor ID",
+          "unique_name": "[DimPurchaseOrder].[Vendor ID]",
+          "sql_type": "int"
+        },
+        {
+          "name": "ShipMethodID",
+          "mdx_name": "Ship Method ID",
+          "unique_name": "[DimPurchaseOrder].[Ship Method ID]",
+          "sql_type": "int"
+        },
+        {
+          "name": "OrderDate",
+          "mdx_name": "Order Date",
+          "unique_name": "[DimPurchaseOrder].[Order Date]",
+          "sql_type": "datetime"
+        },
+        {
+          "name": "ShipDate",
+          "mdx_name": "Ship Date",
+          "unique_name": "[DimPurchaseOrder].[Ship Date]",
+          "sql_type": "datetime"
+        },
+        {
+          "name": "SubTotal",
+          "mdx_name": "Sub Total",
+          "unique_name": "[DimPurchaseOrder].[Sub Total]",
+          "sql_type": "money"
+        },
+        {
+          "name": "TaxAmt",
+          "mdx_name": "Tax Amt",
+          "unique_name": "[DimPurchaseOrder].[Tax Amt]",
+          "sql_type": "money"
+        },
+        {
+          "name": "Freight",
+          "mdx_name": "Freight",
+          "unique_name": "[DimPurchaseOrder].[Freight]",
+          "sql_type": "money"
+        },
+        {
+          "name": "TotalDue",
+          "mdx_name": "Total Due",
+          "unique_name": "[DimPurchaseOrder].[Total Due]",
+          "sql_type": "money"
+        }
+      ],
+      "hierarchies": []
+    },
+    {
+      "name": "DimVendor",
+      "source_table": "DimVendor",
+      "key_attribute": "VendorKey",
+      "unique_name": "[DimVendor]",
+      "attributes": [
+        {
+          "name": "VendorKey",
+          "mdx_name": "Vendor Key",
+          "unique_name": "[DimVendor].[Vendor Key]",
+          "sql_type": "int"
+        },
+        {
+          "name": "VendorID",
+          "mdx_name": "Vendor ID",
+          "unique_name": "[DimVendor].[Vendor ID]",
+          "sql_type": "int"
+        },
+        {
+          "name": "AccountNumber",
+          "mdx_name": "Account Number",
+          "unique_name": "[DimVendor].[Account Number]",
+          "sql_type": "nvarchar"
+        },
+        {
+          "name": "VendorName",
+          "mdx_name": "Vendor Name",
+          "unique_name": "[DimVendor].[Vendor Name]",
+          "sql_type": "nvarchar"
+        },
+        {
+          "name": "CreditRating",
+          "mdx_name": "Credit Rating",
+          "unique_name": "[DimVendor].[Credit Rating]",
+          "sql_type": "int"
+        },
+        {
+          "name": "PreferredVendorStatus",
+          "mdx_name": "Preferred Vendor Status",
+          "unique_name": "[DimVendor].[Preferred Vendor Status]",
+          "sql_type": "bit"
+        },
+        {
+          "name": "ActiveFlag",
+          "mdx_name": "Active Flag",
+          "unique_name": "[DimVendor].[Active Flag]",
+          "sql_type": "bit"
+        }
+      ],
+      "hierarchies": []
+    },
+    {
+      "name": "DimWorkOrder",
+      "source_table": "DimWorkOrder",
+      "key_attribute": "WorkOrderKey",
+      "unique_name": "[DimWorkOrder]",
+      "attributes": [
+        {
+          "name": "WorkOrderKey",
+          "mdx_name": "Work Order Key",
+          "unique_name": "[DimWorkOrder].[Work Order Key]",
+          "sql_type": "int"
+        },
+        {
+          "name": "WorkOrderID",
+          "mdx_name": "Work Order ID",
+          "unique_name": "[DimWorkOrder].[Work Order ID]",
+          "sql_type": "int"
+        },
+        {
+          "name": "ProductID",
+          "mdx_name": "Product ID",
+          "unique_name": "[DimWorkOrder].[Product ID]",
+          "sql_type": "int"
+        },
+        {
+          "name": "StartDate",
+          "mdx_name": "Start Date",
+          "unique_name": "[DimWorkOrder].[Start Date]",
+          "sql_type": "datetime"
+        },
+        {
+          "name": "EndDate",
+          "mdx_name": "End Date",
+          "unique_name": "[DimWorkOrder].[End Date]",
+          "sql_type": "datetime"
+        },
+        {
+          "name": "DueDate",
+          "mdx_name": "Due Date",
+          "unique_name": "[DimWorkOrder].[Due Date]",
+          "sql_type": "datetime"
+        },
+        {
+          "name": "OrderQty",
+          "mdx_name": "Order Qty",
+          "unique_name": "[DimWorkOrder].[Order Qty]",
+          "sql_type": "int"
+        },
+        {
+          "name": "ScrappedQty",
+          "mdx_name": "Scrapped Qty",
+          "unique_name": "[DimWorkOrder].[Scrapped Qty]",
+          "sql_type": "smallint"
+        },
+        {
+          "name": "ScrapReasonID",
+          "mdx_name": "Scrap Reason ID",
+          "unique_name": "[DimWorkOrder].[Scrap Reason ID]",
+          "sql_type": "smallint"
+        }
+      ],
+      "hierarchies": []
+    }
+  ],
+  "facts": [
+    {
+      "name": "FactInventoryMovement",
+      "source_table": "FactInventoryMovement",
+      "measures": [
+        {
+          "name": "Quantity",
+          "column": "Quantity",
+          "agg": "Sum",
+          "sql_type": "decimal"
+        },
+        {
+          "name": "Actual Cost",
+          "column": "ActualCost",
+          "agg": "Sum",
+          "sql_type": "money"
+        },
+        {
+          "name": "Movement Count",
+          "column": "MovementCount",
+          "agg": "Count",
+          "sql_type": "int"
+        },
+        {
+          "name": "Total Movement Cost",
+          "column": "TotalMovementCost",
+          "agg": "Sum",
+          "sql_type": "money"
+        }
+      ]
+    },
+    {
+      "name": "FactProductionImpact",
+      "source_table": "FactProductionImpact",
+      "measures": [
+        {
+          "name": "Order Qty",
+          "column": "OrderQty",
+          "agg": "Sum",
+          "sql_type": "int"
+        },
+        {
+          "name": "Scrapped Qty",
+          "column": "ScrappedQty",
+          "agg": "Sum",
+          "sql_type": "smallint"
+        },
+        {
+          "name": "Scrap Rate",
+          "column": "ScrapRate",
+          "agg": "Avg",
+          "sql_type": "decimal"
+        },
+        {
+          "name": "Risk Flag",
+          "column": "RiskFlag",
+          "agg": "Count",
+          "sql_type": "bit"
+        }
+      ]
+    },
+    {
+      "name": "FactSupplyRisk",
+      "source_table": "FactSupplyRisk",
+      "measures": [
+        {
+          "name": "Order Qty",
+          "column": "OrderQty",
+          "agg": "Sum",
+          "sql_type": "int"
+        },
+        {
+          "name": "Received Qty",
+          "column": "ReceivedQty",
+          "agg": "Sum",
+          "sql_type": "decimal"
+        },
+        {
+          "name": "Rejected Qty",
+          "column": "RejectedQty",
+          "agg": "Sum",
+          "sql_type": "decimal"
+        },
+        {
+          "name": "Stocked Qty",
+          "column": "StockedQty",
+          "agg": "Sum",
+          "sql_type": "decimal"
+        },
+        {
+          "name": "Unit Price",
+          "column": "UnitPrice",
+          "agg": "Sum",
+          "sql_type": "money"
+        },
+        {
+          "name": "Line Amount",
+          "column": "LineAmount",
+          "agg": "Sum",
+          "sql_type": "money"
+        },
+        {
+          "name": "Delay Days",
+          "column": "DelayDays",
+          "agg": "Sum",
+          "sql_type": "int"
+        },
+        {
+          "name": "Late Flag",
+          "column": "LateFlag",
+          "agg": "Count",
+          "sql_type": "bit"
+        }
+      ]
+    }
+  ],
+  "natural_hierarchies": {
+    "DimDate": [
+      {
+        "name": "Calendar",
+        "mdx_name": "Calendar",
+        "unique_name": null,
+        "levels": [
+          {
+            "name": "YearNumber",
+            "mdx_name": "Year Number",
+            "unique_name": null,
+            "source_column": "YearNumber"
+          },
+          {
+            "name": "QuarterNumber",
+            "mdx_name": "Quarter Number",
+            "unique_name": null,
+            "source_column": "QuarterNumber"
+          },
+          {
+            "name": "MonthName",
+            "mdx_name": "Month Name",
+            "unique_name": null,
+            "source_column": "MonthName"
+          },
+          {
+            "name": "FullDate",
+            "mdx_name": "Full Date",
+            "unique_name": null,
+            "source_column": "FullDate"
+          }
+        ]
+      }
+    ],
+    "DimProduct": [
+      {
+        "name": "Product",
+        "mdx_name": "Product",
+        "unique_name": null,
+        "levels": [
+          {
+            "name": "ProductName",
+            "mdx_name": "Product Name",
+            "unique_name": null,
+            "source_column": "ProductName"
+          }
+        ]
+      }
+    ],
+    "DimPurchaseOrder": [
+      {
+        "name": "Purchase Order",
+        "mdx_name": "Purchase Order",
+        "unique_name": null,
+        "levels": [
+          {
+            "name": "PurchaseOrderID",
+            "mdx_name": "Purchase Order ID",
+            "unique_name": null,
+            "source_column": "PurchaseOrderID"
+          },
+          {
+            "name": "OrderDate",
+            "mdx_name": "Order Date",
+            "unique_name": null,
+            "source_column": "OrderDate"
+          },
+          {
+            "name": "ShipDate",
+            "mdx_name": "Ship Date",
+            "unique_name": null,
+            "source_column": "ShipDate"
+          }
+        ]
+      }
+    ],
+    "DimVendor": [
+      {
+        "name": "Vendor",
+        "mdx_name": "Vendor",
+        "unique_name": null,
+        "levels": [
+          {
+            "name": "VendorName",
+            "mdx_name": "Vendor Name",
+            "unique_name": null,
+            "source_column": "VendorName"
+          },
+          {
+            "name": "AccountNumber",
+            "mdx_name": "Account Number",
+            "unique_name": null,
+            "source_column": "AccountNumber"
+          }
+        ]
+      }
+    ],
+    "DimWorkOrder": [
+      {
+        "name": "Work Order",
+        "mdx_name": "Work Order",
+        "unique_name": null,
+        "levels": [
+          {
+            "name": "WorkOrderID",
+            "mdx_name": "Work Order ID",
+            "unique_name": null,
+            "source_column": "WorkOrderID"
+          },
+          {
+            "name": "StartDate",
+            "mdx_name": "Start Date",
+            "unique_name": null,
+            "source_column": "StartDate"
+          },
+          {
+            "name": "DueDate",
+            "mdx_name": "Due Date",
+            "unique_name": null,
+            "source_column": "DueDate"
+          }
+        ]
+      }
+    ]
+  }
+}

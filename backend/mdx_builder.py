@@ -3,7 +3,13 @@ from __future__ import annotations
 import re
 from typing import Dict, Any, List, Optional, Tuple
 
-
+from validator import (
+    _find_fact_for_measure,
+    _is_valid_attr_for_dim,
+    _looks_like_measure_name,
+    normalize_plan_measure_facts,
+    normalize_plan_dimensions,
+)
 # =========================================================
 # BASIC HELPERS
 # =========================================================
@@ -89,7 +95,6 @@ def _extract_dimension_attributes(schema: Dict[str, Any]) -> Dict[str, List[str]
             result[dim_name] = attrs
 
     return result
-
 
 
 # =========================================================
@@ -188,7 +193,6 @@ def _is_metric_oriented_but_incomplete(text: str, schema: Dict[str, Any]) -> boo
     return has_metric_signal and not has_axis_or_filter
 
 
-
 def _guess_relevant_measures(text: str, schema: Dict[str, Any], max_items: int = 5) -> List[str]:
     t = _norm_text(text)
     all_measures = _extract_all_measure_names(schema)
@@ -223,6 +227,13 @@ def _guess_relevant_measures(text: str, schema: Dict[str, Any], max_items: int =
         "avis": ["Review Count"],
         "review": ["Review Count"],
         "reviews": ["Review Count"],
+        "retard": ["Late Flag", "Delay Days"],
+        "retards": ["Late Flag", "Delay Days"],
+        "late": ["Late Flag", "Delay Days"],
+        "delay": ["Delay Days", "Late Flag"],
+        "achat": ["Line Amount"],
+        "achats": ["Line Amount"],
+        "line amount": ["Line Amount"],
     }
 
     def add_if_exists(name: str):
@@ -249,6 +260,9 @@ def _guess_relevant_measures(text: str, schema: Dict[str, Any], max_items: int =
             "Standard Cost",
             "Rating",
             "Review Count",
+            "Late Flag",
+            "Delay Days",
+            "Line Amount",
         ]
         for fallback in fallback_priority:
             add_if_exists(fallback)
@@ -284,8 +298,11 @@ def _guess_relevant_dimensions(text: str, schema: Dict[str, Any], max_items: int
         "dates": ["DimDate"],
         "jour": ["DimDate"],
         "fournisseur": ["DimVendor"],
+        "fournisseurs": ["DimVendor"],
         "vendor": ["DimVendor"],
+        "vendors": ["DimVendor"],
         "commande": ["DimPurchaseOrder"],
+        "commandes": ["DimPurchaseOrder"],
         "purchase order": ["DimPurchaseOrder"],
         "work order": ["DimWorkOrder"],
     }
@@ -423,37 +440,6 @@ def _friendly_fact_prefix_for_mdx(fact_name: str) -> str:
     return mapping.get(fact_name, "")
 
 
-def _measure_exists_in_fact(schema: dict, fact_table: str, measure_name: str) -> bool:
-    for fact in schema.get("facts", []) or []:
-        if (fact.get("name") or "").strip() != (fact_table or "").strip():
-            continue
-
-        for m in fact.get("measures", []) or []:
-            m_name = (m.get("name") or "").strip()
-            m_col = (m.get("column") or "").strip()
-            if _norm(m_name) == _norm(measure_name) or _norm(m_col) == _norm(measure_name):
-                return True
-
-    return False
-
-
-def _find_fact_for_measure(schema: Optional[Dict[str, Any]], measure_name: str) -> str:
-    if not schema or not measure_name:
-        return ""
-
-    matches = []
-    for fact in schema.get("facts", []) or []:
-        fact_name = (fact.get("name") or "").strip()
-        for m in fact.get("measures", []) or []:
-            m_name = (m.get("name") or "").strip()
-            m_col = (m.get("column") or "").strip()
-            if _norm(m_name) == _norm(measure_name) or _norm(m_col) == _norm(measure_name):
-                matches.append(fact_name)
-
-    matches = list(dict.fromkeys(matches))
-    return matches[0] if len(matches) == 1 else ""
-
-
 def _measure_exists_in_snapshot(schema: Optional[Dict[str, Any]], fact_table: str, measure_name: str) -> Optional[str]:
     if not schema:
         return None
@@ -527,7 +513,7 @@ def _has_metric_intent(text: str) -> bool:
         "count", "nombre", "sum", "somme", "measure", "mesure",
         "order qty", "unit price", "standard cost", "rating", "note",
         "review count", "quantity", "delay", "risk", "avis",
-        "volume de vente", "volume des ventes",
+        "volume de vente", "volume des ventes", "late flag", "delay days", "line amount",
     ]
     return any(k in t for k in metric_keywords)
 
@@ -592,6 +578,7 @@ def _wants_product_listing(text: str) -> bool:
         "profit", "cost", "price", "revenu", "revenue", "order qty",
         "unit price", "standard cost", "rating", "review count", "count",
         "nombre", "sum", "somme", "average", "avg", "moyenne", "moyen",
+        "late flag", "delay days", "line amount", "retard", "retards",
     ]
     return any(w in t for w in product_words) and not any(w in t for w in analytic_words)
 
@@ -832,6 +819,55 @@ FROM [{cube_name}]{where_clause};
 def _resolve_default_measure_name(user_prompt: str, schema: Optional[Dict[str, Any]], fact_table: str) -> Tuple[str, str]:
     t = (user_prompt or "").lower()
 
+    # ===== Sujet 2 : Supply Risk =====
+    if any(x in t for x in ["retard", "retards", "en retard", "late", "delay", "delai", "délai"]):
+        if any(x in t for x in ["montant", "montants", "achat", "achats", "line amount"]):
+            return "Line Amount", "FactSupplyRisk"
+        if any(x in t for x in ["jours", "day", "days", "delay days", "durée", "duree"]):
+            return "Delay Days", "FactSupplyRisk"
+        return "Late Flag", "FactSupplyRisk"
+
+    if any(x in t for x in ["fournisseur", "fournisseurs", "vendor", "vendors"]):
+        return "Late Flag", "FactSupplyRisk"
+
+    if any(x in t for x in ["commande d'achat", "commandes d'achat", "commandes d achat", "purchase order"]):
+        return "Late Flag", "FactSupplyRisk"
+
+    if any(x in t for x in ["montant d'achat", "montants d'achats", "montants achats", "line amount"]):
+        return "Line Amount", "FactSupplyRisk"
+        # ===== Sujet 2 : Production Impact =====
+    if any(x in t for x in ["ordre de fabrication", "ordres de fabrication", "work order", "work orders"]):
+        return "Risk Flag", "FactProductionImpact"
+
+    if any(x in t for x in ["fragilisé", "fragilises", "fragilisés", "fragilise", "fragilisee"]):
+        return "Risk Flag", "FactProductionImpact"
+
+    if any(x in t for x in ["scrap", "scrapped", "scrapped qty", "scrap rate"]):
+        if any(x in t for x in ["rate", "taux"]):
+            return "Scrap Rate", "FactProductionImpact"
+        return "Scrapped Qty", "FactProductionImpact"
+
+    if any(x in t for x in ["quantités planifiées", "quantite planifiee", "quantites planifiees", "planned quantities", "planned qty"]):
+        return "Order Qty", "FactProductionImpact"
+
+    if any(x in t for x in ["risque", "risk flag", "menacées", "menacees", "bloqué", "blocked"]):
+        return "Risk Flag", "FactProductionImpact"
+    
+    if any(x in t for x in ["mouvement", "mouvements", "movement", "movements", "fréquents", "frequents"]):
+        return "Movement Count", "FactInventoryMovement"
+
+    if any(x in t for x in ["stock", "inventaire", "inventory", "sortent vite du stock", "rotation rapide"]):
+        return "Quantity", "FactInventoryMovement"
+
+    if any(x in t for x in ["tension d’inventaire", "tension d'inventaire", "inventory tension"]):
+        return "Movement Count", "FactInventoryMovement"
+
+    if any(x in t for x in ["actual cost", "coût réel", "cout reel"]):
+        return "Actual Cost", "FactInventoryMovement"
+
+    if any(x in t for x in ["total movement cost", "coût total de mouvement", "cout total de mouvement"]):
+        return "Total Movement Cost", "FactInventoryMovement"
+    # ===== Sujet 1 / logique existante =====
     if any(x in t for x in ["avis", "review", "reviews", "nombre d’avis", "nombre d'avis"]):
         return "Review Count", "FactReviews"
     if any(x in t for x in ["rating", "note", "notes", "satisfaction"]):
@@ -859,7 +895,8 @@ def _listing_needs_supporting_measure(user_prompt: str, dims: List[Dict[str, Any
         "vendu", "vendus", "vente", "ventes", "sales", "sold",
         "avec des ventes", "avec ventes", "avis", "reviews", "review",
         "nombre d'avis", "nombre d’avis", "marge", "margin", "profit",
-        "chiffre d'affaires", "chiffre d affaires", "revenue", "avec", "ayant"
+        "chiffre d'affaires", "chiffre d affaires", "revenue", "avec", "ayant",
+        "retard", "retards", "late", "delay"
     ]
 
     has_business_filter = any(x in t for x in business_filter_words)
@@ -877,7 +914,6 @@ def _resolve_supporting_measure(user_prompt: str, schema: Optional[Dict[str, Any
     default_measure, default_fact = _resolve_default_measure_name(user_prompt, schema, fact_table)
     return _measure_unique_name(default_measure, default_fact, schema)
 
-
 # =========================================================
 # ROW SELECTION
 # =========================================================
@@ -885,6 +921,23 @@ def _resolve_supporting_measure(user_prompt: str, schema: Optional[Dict[str, Any
 def _pick_best_single_row_expr(plan_dims: List[Dict[str, Any]], schema: Optional[Dict[str, Any]], user_prompt: str = "") -> Optional[str]:
     if not plan_dims:
         return None
+
+    t = (user_prompt or "").lower()
+
+    if (
+        any(x in t for x in ["produit", "produits", "product", "products"])
+        and any(x in t for x in ["retard", "retards", "late", "delay"])
+    ):
+        return _members("DimProduct", "ProductName", schema)
+
+    if (
+        any(x in t for x in ["fournisseur", "fournisseurs", "vendor", "vendors"])
+        and any(x in t for x in ["retard", "retards", "late", "delay"])
+    ):
+        return _members("DimVendor", "VendorName", schema)
+
+    if any(x in t for x in ["commande d'achat", "commandes d'achat", "commandes d achat", "purchase order"]):
+        return _members("DimPurchaseOrder", "PurchaseOrderID", schema)
 
     requested_target = _detect_requested_listing_target(user_prompt)
     if requested_target:
@@ -896,9 +949,11 @@ def _pick_best_single_row_expr(plan_dims: List[Dict[str, Any]], schema: Optional
 
             if _norm(dim_name) == _norm(wanted_dim):
                 for a in attrs:
-                    if _norm(a) == _norm(wanted_attr):
+                    if _norm(a) == _norm(wanted_attr) and _is_valid_attr_for_dim(schema, dim_name, a):
                         return _members(dim_name, a, schema)
-                return _members(dim_name, wanted_attr, schema)
+
+                if _is_valid_attr_for_dim(schema, dim_name, wanted_attr):
+                    return _members(dim_name, wanted_attr, schema)
 
     for d in plan_dims:
         dim_name = (d.get("name") or d.get("dimension") or d.get("table") or "").strip()
@@ -907,17 +962,28 @@ def _pick_best_single_row_expr(plan_dims: List[Dict[str, Any]], schema: Optional
         if "product" in dim_name.lower():
             for wanted in ["ProductName", "Product Name", "Category", "SubCategory", "Sub Category"]:
                 for a in attrs:
-                    if _norm(a) == _norm(wanted):
+                    if (
+                        _norm(a) == _norm(wanted)
+                        and _is_valid_attr_for_dim(schema, dim_name, a)
+                        and not _looks_like_measure_name(schema, a)
+                    ):
                         return _members(dim_name, a, schema)
-            if attrs:
-                return _members(dim_name, attrs[0], schema)
+
+            for a in attrs:
+                if _is_valid_attr_for_dim(schema, dim_name, a) and not _looks_like_measure_name(schema, a):
+                    return _members(dim_name, a, schema)
 
     for d in plan_dims:
         dim_name = (d.get("name") or d.get("dimension") or d.get("table") or "").strip()
         attrs = [a.strip() for a in (d.get("attributes") or d.get("levels") or []) if isinstance(a, str) and a.strip()]
+
         for wanted in ["Category", "SubCategory", "Sub Category"]:
             for a in attrs:
-                if _norm(a) == _norm(wanted):
+                if (
+                    _norm(a) == _norm(wanted)
+                    and _is_valid_attr_for_dim(schema, dim_name, a)
+                    and not _looks_like_measure_name(schema, a)
+                ):
                     return _members(dim_name, a, schema)
 
     for d in plan_dims:
@@ -927,16 +993,23 @@ def _pick_best_single_row_expr(plan_dims: List[Dict[str, Any]], schema: Optional
         if "date" in dim_name.lower() or "time" in dim_name.lower():
             for wanted in ["Year", "YearNumber", "Month", "MonthName", "FullDate", "Full Date"]:
                 for a in attrs:
-                    if _norm(a) == _norm(wanted):
+                    if (
+                        _norm(a) == _norm(wanted)
+                        and _is_valid_attr_for_dim(schema, dim_name, a)
+                        and not _looks_like_measure_name(schema, a)
+                    ):
                         return _members(dim_name, a, schema)
-            if attrs:
-                return _members(dim_name, attrs[0], schema)
+
+            for a in attrs:
+                if _is_valid_attr_for_dim(schema, dim_name, a) and not _looks_like_measure_name(schema, a):
+                    return _members(dim_name, a, schema)
 
     for d in plan_dims:
         dim_name = (d.get("name") or d.get("dimension") or d.get("table") or "").strip()
         attrs = [a.strip() for a in (d.get("attributes") or d.get("levels") or []) if isinstance(a, str) and a.strip()]
-        if dim_name and attrs:
-            return _members(dim_name, attrs[0], schema)
+        for a in attrs:
+            if _is_valid_attr_for_dim(schema, dim_name, a) and not _looks_like_measure_name(schema, a):
+                return _members(dim_name, a, schema)
 
     return None
 
@@ -1537,6 +1610,69 @@ def _build_semantic_candidate_measures(user_prompt: str) -> List[Dict[str, str]]
         if not any(_norm(c["name"]) == _norm(name) for c in candidates):
             candidates.append({"name": name})
 
+    # ===== Sujet 2 : Supply Risk =====
+    if any(x in t for x in ["retard", "retards", "en retard", "late", "delay", "delai", "délai"]):
+        add("Late Flag")
+        add("Delay Days")
+
+    if any(x in t for x in ["montant", "montants", "achat", "achats", "line amount"]):
+        add("Line Amount")
+
+    if any(x in t for x in ["fournisseur", "fournisseurs", "vendor", "vendors"]):
+        add("Late Flag")
+
+    if any(x in t for x in ["commande d'achat", "commandes d'achat", "commandes d achat", "purchase order"]):
+        add("Late Flag")
+    
+        # ===== Sujet 2 : Production Impact =====
+    if any(x in t for x in ["ordre de fabrication", "ordres de fabrication", "work order", "work orders"]):
+        add("Risk Flag")
+        add("Scrap Rate")
+
+    if any(x in t for x in ["fragilisé", "fragilises", "fragilisés", "fragilise", "fragilisee"]):
+        add("Risk Flag")
+        add("Scrapped Qty")
+        add("Scrap Rate")
+    
+    if any(x in t for x in ["quantités planifiées", "quantite planifiee", "quantites planifiees", "planned quantities", "planned qty"]):
+        add("Order Qty")
+        add("Risk Flag")
+
+    if any(x in t for x in ["scrap", "scrapped", "scrapped qty"]):
+        add("Scrapped Qty")
+
+    if any(x in t for x in ["scrap rate", "taux de rebut", "taux rebut"]):
+        add("Scrap Rate")
+
+    if any(x in t for x in ["risque", "risk flag", "bloqué", "blocked", "menacées", "menacees"]):
+        add("Risk Flag")
+    
+        # ===== Sujet 2 : Inventory Movement =====
+    if any(x in t for x in ["mouvement", "mouvements", "movement", "movements"]):
+        add("Movement Count")
+        add("Quantity")
+
+    if any(x in t for x in ["stock", "inventaire", "inventory", "sortent vite du stock", "rotation rapide"]):
+        add("Quantity")
+        add("Movement Count")
+
+    if any(x in t for x in ["instable", "instables", "stock instable"]):
+        add("Movement Count")
+        add("Quantity")
+        add("Total Movement Cost")
+
+    if any(x in t for x in ["tension d’inventaire", "tension d'inventaire", "inventory tension", "signes précoces", "signes precoces"]):
+        add("Movement Count")
+        add("Quantity")
+        add("Actual Cost")
+        add("Total Movement Cost")
+
+    if any(x in t for x in ["actual cost", "coût réel", "cout reel"]):
+        add("Actual Cost")
+
+    if any(x in t for x in ["total movement cost", "coût total de mouvement", "cout total de mouvement"]):
+        add("Total Movement Cost")
+    # ===== Sujet 1 / existant =====
     if any(x in t for x in [
         "très vendus", "tres vendus", "volume de vente", "volume des ventes",
         "quantité vendue", "quantite vendue", "très peu de commandes",
@@ -1640,6 +1776,15 @@ def _extract_relative_measure_conditions(
         if _norm(measure_name) == _norm("Review Count"):
             aliases.update({_norm("avis"), _norm("reviews"), _norm("nombre d'avis"), _norm("nombre d avis"), _norm("aucun avis")})
 
+        if _norm(measure_name) == _norm("Late Flag"):
+            aliases.update({_norm("retard"), _norm("retards"), _norm("late flag"), _norm("late")})
+
+        if _norm(measure_name) == _norm("Delay Days"):
+            aliases.update({_norm("delay"), _norm("delay days"), _norm("jours de retard"), _norm("retard")})
+
+        if _norm(measure_name) == _norm("Line Amount"):
+            aliases.update({_norm("montant"), _norm("montants"), _norm("achat"), _norm("achats"), _norm("line amount")})
+
         found_alias = None
         for a in aliases:
             if a and a in normalized_prompt:
@@ -1675,48 +1820,10 @@ def _extract_relative_measure_conditions(
 # VALIDATION
 # =========================================================
 
-def validate_plan_against_schema(plan: dict, schema: dict) -> list[str]:
-    errors: list[str] = []
-
-    schema_dimensions = {
-        (d.get("name") or d.get("dimension") or d.get("table") or "").strip()
-        for d in schema.get("dimensions", []) or []
-    }
-
-    schema_facts = {
-        (f.get("name") or "").strip()
-        for f in schema.get("facts", []) or []
-    }
-
-    plan_fact_table = (plan.get("fact_table") or "").strip()
-
-    if plan_fact_table and plan_fact_table not in schema_facts:
-        errors.append(f"Unknown fact table in plan: {plan_fact_table}")
-
-    for d in plan.get("dimensions", []) or []:
-        dim_name = (d.get("name") or d.get("dimension") or d.get("table") or "").strip()
-        if dim_name and dim_name not in schema_dimensions:
-            errors.append(f"Unknown dimension in plan: {dim_name}")
-
-    for m in plan.get("measures", []) or []:
-        if not isinstance(m, dict):
-            continue
-        measure_name = (m.get("name") or m.get("column") or "").strip()
-        if not measure_name:
-            continue
-
-        if not _measure_exists_in_fact(schema, plan_fact_table, measure_name):
-            found_fact = _find_fact_for_measure(schema, measure_name)
-            if not found_fact:
-                errors.append(
-                    f"Unknown measure column '{measure_name}' in fact table '{plan_fact_table or 'unknown'}'"
-                )
-
-    return errors
 
 
 # =========================================================
-# FINAL BUILDER
+# FINAL BUILDER HELPERS
 # =========================================================
 
 def _requested_year_available(schema: Optional[Dict[str, Any]], year_value: int) -> bool:
@@ -1777,7 +1884,405 @@ def _same_date_hierarchy_filter_expr(schema: Optional[Dict[str, Any]], rows_expr
     return f"DESCENDANTS([{dim_name}].[{hierarchy_name}].[{year_level_name}].&[{year_value}], [{dim_name}].[{hierarchy_name}].[{current_level_name}])"
 
 
+# =========================================================
+# SPECIAL PROMPT HANDLERS - SUJET 2 (SUPPLY RISK)
+# =========================================================
+
+def _is_supply_risk_prompt(user_prompt: str) -> bool:
+    t = (user_prompt or "").lower()
+
+    supply_words = [
+        "fournisseur", "fournisseurs", "vendor", "vendors",
+        "retard", "retards", "en retard", "late", "delay", "delai", "délai",
+        "commande", "commandes", "purchase order", "purchase orders",
+        "achat", "achats", "montant d'achat", "montants d'achats",
+        "line amount", "delay days", "late flag"
+    ]
+    return any(w in t for w in supply_words)
+
+
+def _pick_supply_risk_rows_expr(schema: Optional[Dict[str, Any]], user_prompt: str) -> str:
+    t = (user_prompt or "").lower()
+
+    if any(x in t for x in ["fournisseur", "fournisseurs", "vendor", "vendors"]):
+        return _members("DimVendor", "VendorName", schema)
+
+    if any(x in t for x in ["produit", "produits", "product", "products"]):
+        return _members("DimProduct", "ProductName", schema)
+
+    if any(x in t for x in [
+        "commande", "commandes", "purchase order", "purchase orders",
+        "commande d'achat", "commandes d'achat", "commandes d achat"
+    ]):
+        return _members("DimPurchaseOrder", "PurchaseOrderID", schema)
+
+    return _members("DimVendor", "VendorName", schema)
+
+
+def _build_supply_risk_prompt_mdx(
+    user_prompt: str,
+    cube_name: str,
+    schema: Optional[Dict[str, Any]]
+) -> Optional[str]:
+    t = (user_prompt or "").lower()
+
+    late_flag_measure = _measure_unique_name("Late Flag", "FactSupplyRisk", schema)
+    delay_days_measure = _measure_unique_name("Delay Days", "FactSupplyRisk", schema)
+    line_amount_measure = _measure_unique_name("Line Amount", "FactSupplyRisk", schema)
+
+    if (
+        any(x in t for x in ["fournisseur", "fournisseurs", "vendor", "vendors"])
+        and any(x in t for x in ["retard", "retards", "en retard", "late"])
+    ):
+        rows_expr = _members("DimVendor", "VendorName", schema)
+        mdx = f"""
+SELECT
+{{ {late_flag_measure} }} ON COLUMNS,
+NON EMPTY FILTER(
+  {rows_expr},
+  {late_flag_measure} > 0
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    if (
+        any(x in t for x in ["produit", "produits", "product", "products"])
+        and any(x in t for x in ["retard", "retards", "en retard", "late"])
+        and any(x in t for x in ["plus touchés", "plus touches", "most affected", "les plus touchés"])
+    ):
+        rows_expr = _members("DimProduct", "ProductName", schema)
+        mdx = f"""
+SELECT
+{{ {late_flag_measure}, {delay_days_measure} }} ON COLUMNS,
+NON EMPTY TOPCOUNT(
+  FILTER({rows_expr}, {late_flag_measure} > 0),
+  10,
+  {delay_days_measure}
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    if any(x in t for x in [
+        "montants d’achats", "montants d'achats", "montant d’achat", "montant d'achat",
+        "montants achats", "montant achat", "achats concernés", "achats concernes"
+    ]):
+        rows_expr = _members("DimPurchaseOrder", "PurchaseOrderID", schema)
+        mdx = f"""
+SELECT
+{{ {line_amount_measure}, {late_flag_measure} }} ON COLUMNS,
+NON EMPTY FILTER(
+  {rows_expr},
+  {late_flag_measure} > 0
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    if any(x in t for x in [
+        "fréquence des commandes en retard", "frequence des commandes en retard",
+        "fréquence", "frequence"
+    ]) and any(x in t for x in ["commande", "commandes", "purchase order", "retard", "late"]):
+        rows_expr = _members("DimPurchaseOrder", "PurchaseOrderID", schema)
+        mdx = f"""
+SELECT
+{{ {late_flag_measure} }} ON COLUMNS,
+NON EMPTY FILTER(
+  {rows_expr},
+  {late_flag_measure} > 0
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    if (
+        any(x in t for x in ["retard", "retards", "late", "delay"])
+        and any(x in t for x in ["fournisseur", "fournisseurs", "vendor", "vendors"])
+    ):
+        rows_expr = _members("DimVendor", "VendorName", schema)
+        mdx = f"""
+SELECT
+{{ {late_flag_measure} }} ON COLUMNS,
+NON EMPTY FILTER(
+  {rows_expr},
+  {late_flag_measure} > 0
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    return None
+
+
+# =========================================================
+# FINAL BUILDER
+# =========================================================
+# =========================================================
+# SPECIAL PROMPT HANDLERS - SUJET 2 (PRODUCTION IMPACT)
+# =========================================================
+
+def _is_production_impact_prompt(user_prompt: str) -> bool:
+    t = (user_prompt or "").lower()
+
+    production_words = [
+        "ordre de fabrication", "ordres de fabrication",
+        "work order", "work orders",
+        "production", "fabrication",
+        "bloqué", "bloques", "bloqué", "bloquées", "bloques", "blocked",
+        "fragilisé", "fragilises", "fragilisés", "fragilise", "fragilisée", "fragilisee",
+        "approvisionnement", "supply", "problème d’approvisionnement", "probleme d'approvisionnement",
+        "quantités planifiées", "quantite planifiee", "quantités menacées", "quantites menacees",
+        "scrap", "scrapped", "scrapped qty", "scrap rate", "risk flag", "risque"
+    ]
+    return any(w in t for w in production_words)
+
+
+def _build_production_impact_prompt_mdx(
+    user_prompt: str,
+    cube_name: str,
+    schema: Optional[Dict[str, Any]]
+) -> Optional[str]:
+    t = (user_prompt or "").lower()
+
+    risk_flag_measure = _measure_unique_name("Risk Flag", "FactProductionImpact", schema)
+    order_qty_measure = _measure_unique_name("Order Qty", "FactProductionImpact", schema)
+    scrapped_qty_measure = _measure_unique_name("Scrapped Qty", "FactProductionImpact", schema)
+    scrap_rate_measure = _measure_unique_name("Scrap Rate", "FactProductionImpact", schema)
+
+    workorder_rows = _members("DimWorkOrder", "WorkOrderID", schema)
+    product_rows = _members("DimProduct", "ProductName", schema)
+
+    # 1) Quels ordres de fabrication risquent d’être bloqués ?
+    if (
+        any(x in t for x in ["ordre de fabrication", "ordres de fabrication", "work order", "work orders"])
+        and any(x in t for x in ["bloqué", "bloques", "bloqué", "bloquées", "blocked", "risquent"])
+    ):
+        mdx = f"""
+SELECT
+{{ {risk_flag_measure}, {scrap_rate_measure} }} ON COLUMNS,
+NON EMPTY FILTER(
+  {workorder_rows},
+  {risk_flag_measure} > 0
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    # 2) Quels produits en production sont fragilisés ?
+    if (
+        any(x in t for x in ["produit", "produits", "product", "products"])
+        and any(x in t for x in ["production", "fabrication"])
+        and any(x in t for x in ["fragilisé", "fragilises", "fragilisés", "fragilise", "fragilisée", "fragilisee"])
+    ):
+        mdx = f"""
+SELECT
+{{ {risk_flag_measure}, {scrapped_qty_measure}, {scrap_rate_measure} }} ON COLUMNS,
+NON EMPTY TOPCOUNT(
+  FILTER({product_rows}, {risk_flag_measure} > 0),
+  10,
+  {scrapped_qty_measure}
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    # 3) Quel est l’effet des problèmes d’approvisionnement sur la fabrication ?
+    if (
+        any(x in t for x in ["approvisionnement", "supply", "problème d’approvisionnement", "probleme d'approvisionnement"])
+        and any(x in t for x in ["fabrication", "production"])
+    ):
+        mdx = f"""
+SELECT
+{{ {risk_flag_measure}, {scrapped_qty_measure}, {scrap_rate_measure}, {order_qty_measure} }} ON COLUMNS,
+NON EMPTY FILTER(
+  {workorder_rows},
+  {risk_flag_measure} > 0
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    # 4) Quelles quantités planifiées sont menacées ?
+    if any(x in t for x in [
+        "quantités planifiées", "quantite planifiee", "quantites planifiees",
+        "quantités menacées", "quantites menacees", "planned quantities", "planned qty"
+    ]):
+        mdx = f"""
+SELECT
+{{ {order_qty_measure}, {risk_flag_measure}, {scrap_rate_measure} }} ON COLUMNS,
+NON EMPTY FILTER(
+  {workorder_rows},
+  {risk_flag_measure} > 0
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    # variantes plus générales
+    if (
+        any(x in t for x in ["work order", "work orders", "ordre de fabrication", "ordres de fabrication"])
+        and any(x in t for x in ["risque", "risk", "bloqué", "blocked"])
+    ):
+        mdx = f"""
+SELECT
+{{ {risk_flag_measure}, {scrap_rate_measure} }} ON COLUMNS,
+NON EMPTY FILTER(
+  {workorder_rows},
+  {risk_flag_measure} > 0
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    if (
+        any(x in t for x in ["produit", "produits", "product", "products"])
+        and any(x in t for x in ["fragilisé", "fragilises", "fragilisés", "fragilise", "fragilisee", "menacé", "menaces", "menacés"])
+    ):
+        mdx = f"""
+SELECT
+{{ {risk_flag_measure}, {scrapped_qty_measure} }} ON COLUMNS,
+NON EMPTY FILTER(
+  {product_rows},
+  {risk_flag_measure} > 0
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    return None
+
+# =========================================================
+# SPECIAL PROMPT HANDLERS - SUJET 2 (INVENTORY MOVEMENT)
+# =========================================================
+
+def _is_inventory_movement_prompt(user_prompt: str) -> bool:
+    t = (user_prompt or "").lower()
+
+    inventory_words = [
+        "stock", "inventaire", "inventory",
+        "mouvement", "mouvements", "movement", "movements",
+        "sortent vite du stock", "rotation rapide", "sortie rapide",
+        "fréquents", "frequents", "mouvements fréquents", "mouvements frequents",
+        "instable", "instables", "stock instable",
+        "tension d’inventaire", "tension d'inventaire", "inventory tension",
+        "signes précoces", "signes precoces", "précoce", "precoce"
+    ]
+    return any(w in t for w in inventory_words)
+
+
+def _build_inventory_movement_prompt_mdx(
+    user_prompt: str,
+    cube_name: str,
+    schema: Optional[Dict[str, Any]]
+) -> Optional[str]:
+    t = (user_prompt or "").lower()
+
+    quantity_measure = _measure_unique_name("Quantity", "FactInventoryMovement", schema)
+    movement_count_measure = _measure_unique_name("Movement Count", "FactInventoryMovement", schema)
+    actual_cost_measure = _measure_unique_name("Actual Cost", "FactInventoryMovement", schema)
+    total_movement_cost_measure = _measure_unique_name("Total Movement Cost", "FactInventoryMovement", schema)
+
+    product_rows = _members("DimProduct", "ProductName", schema)
+
+    # 1) quels produits sortent vite du stock ?
+    if any(x in t for x in [
+        "sortent vite du stock", "sort vite du stock", "rotation rapide",
+        "sortie rapide", "fast moving", "fast-moving"
+    ]):
+        mdx = f"""
+SELECT
+{{ {quantity_measure}, {movement_count_measure} }} ON COLUMNS,
+NON EMPTY TOPCOUNT(
+  {product_rows},
+  10,
+  {movement_count_measure}
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    # 2) quels produits ont des mouvements fréquents ?
+    if any(x in t for x in [
+        "mouvements fréquents", "mouvements frequents",
+        "mouvements fréquents", "frequent movements", "mouvements"
+    ]):
+        mdx = f"""
+SELECT
+{{ {movement_count_measure}, {quantity_measure} }} ON COLUMNS,
+NON EMPTY TOPCOUNT(
+  {product_rows},
+  10,
+  {movement_count_measure}
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    # 3) quels produits ont un stock instable ?
+    if any(x in t for x in [
+        "stock instable", "stocks instables", "instable", "instables"
+    ]):
+        mdx = f"""
+WITH
+MEMBER [Measures].[Avg Movement Count] AS AVG({product_rows}, {movement_count_measure})
+MEMBER [Measures].[Avg Quantity] AS AVG({product_rows}, {quantity_measure})
+SELECT
+{{ {movement_count_measure}, {quantity_measure}, {total_movement_cost_measure} }} ON COLUMNS,
+FILTER(
+  {product_rows},
+  {movement_count_measure} > [Measures].[Avg Movement Count]
+  AND
+  ABS({quantity_measure}) > [Measures].[Avg Quantity]
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    # 4) y a-t-il des signes précoces de tension d’inventaire ?
+    if any(x in t for x in [
+        "signes précoces de tension d’inventaire",
+        "signes précoces de tension d'inventaire",
+        "signes precoces de tension d'inventaire",
+        "tension d’inventaire", "tension d'inventaire", "inventory tension"
+    ]):
+        mdx = f"""
+WITH
+MEMBER [Measures].[Avg Movement Count] AS AVG({product_rows}, {movement_count_measure})
+MEMBER [Measures].[Avg Quantity] AS AVG({product_rows}, {quantity_measure})
+SELECT
+{{ {movement_count_measure}, {quantity_measure}, {actual_cost_measure}, {total_movement_cost_measure} }} ON COLUMNS,
+FILTER(
+  {product_rows},
+  {movement_count_measure} > [Measures].[Avg Movement Count]
+  AND
+  ABS({quantity_measure}) > [Measures].[Avg Quantity]
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    # variantes plus générales
+    if any(x in t for x in ["mouvements", "movement"]) and any(x in t for x in ["produit", "produits", "product", "products"]):
+        mdx = f"""
+SELECT
+{{ {movement_count_measure}, {quantity_measure} }} ON COLUMNS,
+NON EMPTY TOPCOUNT(
+  {product_rows},
+  10,
+  {movement_count_measure}
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    return None
+
 def build_mdx(plan: Dict[str, Any], cube_name: str, user_prompt: str = "", schema: Optional[Dict[str, Any]] = None) -> str:
+    safe_schema = schema or {}
+    plan = normalize_plan_measure_facts(plan, safe_schema)
+    plan = normalize_plan_dimensions(plan, safe_schema, user_prompt)
+
     measures = plan.get("measures", [])
     dims = plan.get("dimensions", [])
     fact_table = (plan.get("fact_table") or "").strip()
@@ -1807,42 +2312,89 @@ def build_mdx(plan: Dict[str, Any], cube_name: str, user_prompt: str = "", schem
         for m in measures:
             if not isinstance(m, dict):
                 continue
-            measure_name = (m.get("name") or m.get("caption") or "").strip()
+            measure_name = (m.get("name") or m.get("caption") or m.get("column") or "").strip()
             if measure_name:
-                measure_fact = _find_fact_for_measure(schema, measure_name) or fact_table
-                mset.append(_measure_unique_name(measure_name, measure_fact, schema))
+                measure_fact = _find_fact_for_measure(safe_schema, measure_name) or (m.get("fact_table") or fact_table)
+                mset.append(_measure_unique_name(measure_name, measure_fact, safe_schema))
 
     if review_count_by_category and not mset:
-        mset = [_measure_unique_name("Review Count", "FactReviews", schema)]
+        mset = [_measure_unique_name("Review Count", "FactReviews", safe_schema)]
 
     if not mset and not is_listing_only:
-        default_measure, default_fact = _resolve_default_measure_name(user_prompt, schema, fact_table)
-        mset = [_measure_unique_name(default_measure, default_fact, schema)]
+        default_measure, default_fact = _resolve_default_measure_name(user_prompt, safe_schema, fact_table)
+        mset = [_measure_unique_name(default_measure, default_fact, safe_schema)]
 
     listing_support_measure = None
     if is_listing_only and _listing_needs_supporting_measure(user_prompt, dims):
-        listing_support_measure = _resolve_supporting_measure(user_prompt, schema, fact_table)
+        listing_support_measure = _resolve_supporting_measure(user_prompt, safe_schema, fact_table)
 
     columns = "{}" if is_listing_only else "{ " + ", ".join(mset) + " }"
 
+    if (
+        any(x in (user_prompt or "").lower() for x in ["produit", "produits", "product", "products"])
+        and any(x in (user_prompt or "").lower() for x in ["retard", "retards", "late", "delay"])
+        and any(x in (user_prompt or "").lower() for x in ["plus touchés", "plus touches", "most affected", "les plus touchés"])
+    ):
+        late_flag_measure = _measure_unique_name("Late Flag", "FactSupplyRisk", safe_schema)
+        delay_days_measure = _measure_unique_name("Delay Days", "FactSupplyRisk", safe_schema)
+        rows_expr = _members("DimProduct", "ProductName", safe_schema)
+
+        mdx = f"""
+SELECT
+{{ {late_flag_measure}, {delay_days_measure} }} ON COLUMNS,
+NON EMPTY TOPCOUNT(
+  FILTER({rows_expr}, {late_flag_measure} > 0),
+  10,
+  {delay_days_measure}
+) ON ROWS
+FROM [{cube_name}];
+"""
+        return " ".join(mdx.split())
+
+    if _is_supply_risk_prompt(user_prompt):
+        supply_risk_mdx = _build_supply_risk_prompt_mdx(
+            user_prompt=user_prompt,
+            cube_name=cube_name,
+            schema=safe_schema,
+        )
+        if supply_risk_mdx:
+            return supply_risk_mdx
+        
     special_mdx_v2 = _build_prompt_special_mdx_v2(
         user_prompt=user_prompt,
         cube_name=cube_name,
         dims=dims,
-        schema=schema,
+        schema=safe_schema,
         fact_table=fact_table,
     )
     if special_mdx_v2:
         return special_mdx_v2
+    
+    if _is_inventory_movement_prompt(user_prompt):
+        inventory_movement_mdx = _build_inventory_movement_prompt_mdx(
+            user_prompt=user_prompt,
+            cube_name=cube_name,
+            schema=safe_schema,
+        )
+        if inventory_movement_mdx:
+            return inventory_movement_mdx
+    if _is_production_impact_prompt(user_prompt):
+        production_impact_mdx = _build_production_impact_prompt_mdx(
+            user_prompt=user_prompt,
+            cube_name=cube_name,
+            schema=safe_schema,
+        )
+        if production_impact_mdx:
+            return production_impact_mdx
 
     avg_compare = _resolve_average_comparison_prompt(
         user_prompt=user_prompt,
-        schema=schema,
+        schema=safe_schema,
         fact_table=fact_table,
     )
     if avg_compare:
         avg_conditions, avg_selected_measures = avg_compare
-        rows_expr = _pick_primary_rows_expr_for_filter(dims, schema, user_prompt)
+        rows_expr = _pick_primary_rows_expr_for_filter(dims, safe_schema, user_prompt)
         return _build_relative_filter_mdx(
             cube_name=cube_name,
             rows_expr=rows_expr,
@@ -1854,7 +2406,7 @@ def build_mdx(plan: Dict[str, Any], cube_name: str, user_prompt: str = "", schem
         user_prompt=user_prompt,
         cube_name=cube_name,
         dims=dims,
-        schema=schema,
+        schema=safe_schema,
         fact_table=fact_table,
     )
     if special_mdx:
@@ -1881,17 +2433,20 @@ def build_mdx(plan: Dict[str, Any], cube_name: str, user_prompt: str = "", schem
             {"name": "Rating"},
             {"name": "Unit Price"},
             {"name": "Standard Cost"},
+            {"name": "Late Flag"},
+            {"name": "Delay Days"},
+            {"name": "Line Amount"},
         ]
 
     relative_conditions = _extract_relative_measure_conditions(
         user_prompt=user_prompt,
         measures=candidate_measures,
         fact_table=fact_table,
-        schema=schema,
+        schema=safe_schema,
     )
 
     if len(relative_conditions) >= 2:
-        rows_expr = _pick_primary_rows_expr_for_filter(dims, schema, user_prompt)
+        rows_expr = _pick_primary_rows_expr_for_filter(dims, safe_schema, user_prompt)
         selected_measures = []
         for measure_unique_name, _direction in relative_conditions:
             if measure_unique_name not in selected_measures:
@@ -1910,30 +2465,30 @@ def build_mdx(plan: Dict[str, Any], cube_name: str, user_prompt: str = "", schem
     wants_product_listing = _wants_product_listing(user_prompt)
     agg_intent = _detect_agg_intent(user_prompt)
 
-    if year is not None and not _requested_year_available(schema, year):
+    if year is not None and not _requested_year_available(safe_schema, year):
         raise ValueError(f"Avertissement : l'année {year} n'est pas disponible dans la base.")
 
     if len(years) >= 2 and not is_listing_only and not top_n:
-        date_dim, year_attr = _resolve_date_dim_year(dims, schema)
+        date_dim, year_attr = _resolve_date_dim_year(dims, safe_schema)
         if date_dim and year_attr:
-            year_members = ", ".join(_member_key(date_dim, year_attr, y, schema) for y in years[:2])
+            year_members = ", ".join(_member_key(date_dim, year_attr, y, safe_schema) for y in years[:2])
             rows_expr = f"{{ {year_members} }}"
             mdx = f"SELECT {columns} ON COLUMNS, {rows_expr} ON ROWS FROM {_br(cube_name)};"
             return " ".join(mdx.split())
 
-    if schema and top_n is None and _contains_any(user_prompt.lower(), ["tableau", "deux colonnes", "2 colonnes", "avec leur", "catégorie parente", "categorie parente"]):
+    if safe_schema and top_n is None and _contains_any(user_prompt.lower(), ["tableau", "deux colonnes", "2 colonnes", "avec leur", "catégorie parente", "categorie parente"]):
         for d in dims:
             dim_name = (d.get("name") or d.get("dimension") or d.get("table") or "").strip()
             attrs = [a.strip() for a in (d.get("attributes") or d.get("levels") or []) if isinstance(a, str) and a.strip()]
             if len(attrs) >= 2:
-                same_hierarchy = _same_hierarchy_levels(schema, dim_name, attrs)
+                same_hierarchy = _same_hierarchy_levels(safe_schema, dim_name, attrs)
                 if same_hierarchy:
                     dim_mdx_name, hierarchy_mdx_name, levels = same_hierarchy
                     where_clause = ""
                     if year is not None:
-                        date_dim, year_attr = _resolve_date_dim_year(dims, schema)
+                        date_dim, year_attr = _resolve_date_dim_year(dims, safe_schema)
                         if date_dim and year_attr:
-                            where_clause = f" WHERE ({_member_key(date_dim, year_attr, year, schema)})"
+                            where_clause = f" WHERE ({_member_key(date_dim, year_attr, year, safe_schema)})"
 
                     return _build_same_hierarchy_table_mdx(
                         cube_name=cube_name,
@@ -1944,7 +2499,7 @@ def build_mdx(plan: Dict[str, Any], cube_name: str, user_prompt: str = "", schem
                     )
 
     if top_n is not None:
-        ranking_measure = mset[0] if mset else _measure_unique_name("Line Total", "FactProductSales", schema)
+        ranking_measure = mset[0] if mset else _measure_unique_name("Line Total", "FactProductSales", safe_schema)
 
         rank_dim, rank_attr = _pick_ranking_dim_attr(dims, user_prompt)
         if not rank_dim or not rank_attr:
@@ -1953,26 +2508,26 @@ def build_mdx(plan: Dict[str, Any], cube_name: str, user_prompt: str = "", schem
                 user_prompt
             )
 
-        rows_expr = f"TOPCOUNT({_members(rank_dim, rank_attr, schema)}, {top_n}, {ranking_measure})"
+        rows_expr = f"TOPCOUNT({_members(rank_dim, rank_attr, safe_schema)}, {top_n}, {ranking_measure})"
 
         where_clause = ""
         if year is not None:
-            date_dim, year_attr = _resolve_date_dim_year(dims, schema)
+            date_dim, year_attr = _resolve_date_dim_year(dims, safe_schema)
             if date_dim and year_attr:
-                where_clause = f" WHERE ({_member_key(date_dim, year_attr, year, schema)})"
+                where_clause = f" WHERE ({_member_key(date_dim, year_attr, year, safe_schema)})"
 
         top_columns = "{ " + ranking_measure + " }"
         mdx = f"SELECT {top_columns} ON COLUMNS, NON EMPTY {rows_expr} ON ROWS FROM {_br(cube_name)}{where_clause};"
         return " ".join(mdx.split())
 
     if wants_product_listing and not has_metric_intent:
-        best_row_expr = _pick_best_single_row_expr(dims, schema, user_prompt)
+        best_row_expr = _pick_best_single_row_expr(dims, safe_schema, user_prompt)
         if best_row_expr:
             year_member = None
             if year is not None:
-                date_dim, year_attr = _resolve_date_dim_year(dims, schema)
+                date_dim, year_attr = _resolve_date_dim_year(dims, safe_schema)
                 if date_dim and year_attr:
-                    year_member = _member_key(date_dim, year_attr, year, schema)
+                    year_member = _member_key(date_dim, year_attr, year, safe_schema)
 
             if listing_support_measure:
                 filtered_rows = _build_listing_support_filter(best_row_expr, listing_support_measure, year_member)
@@ -1983,20 +2538,20 @@ def build_mdx(plan: Dict[str, Any], cube_name: str, user_prompt: str = "", schem
 
             return f"SELECT {{}} ON COLUMNS, {best_row_expr} ON ROWS FROM {_br(cube_name)};"
 
-    rows_expr = _pick_best_single_row_expr(dims, schema, user_prompt)
+    rows_expr = _pick_best_single_row_expr(dims, safe_schema, user_prompt)
     if not rows_expr:
-        rows_expr = _members("DimDate", "Year", schema) if schema else "[DimDate].[Year].Members"
+        rows_expr = _members("DimDate", "Year", safe_schema) if safe_schema else "[DimDate].[Year].Members"
 
     where_clause = ""
     if year is not None:
-        same_hierarchy_rows = _same_date_hierarchy_filter_expr(schema, rows_expr, year)
+        same_hierarchy_rows = _same_date_hierarchy_filter_expr(safe_schema, rows_expr, year)
         if same_hierarchy_rows:
             rows_expr = same_hierarchy_rows
         else:
-            date_dim, year_attr = _resolve_date_dim_year(dims, schema)
+            date_dim, year_attr = _resolve_date_dim_year(dims, safe_schema)
             if date_dim and year_attr:
-                year_members = _members(date_dim, year_attr, schema)
-                year_member = _member_key(date_dim, year_attr, year, schema)
+                year_members = _members(date_dim, year_attr, safe_schema)
+                year_member = _member_key(date_dim, year_attr, year, safe_schema)
 
                 if year_members == rows_expr:
                     rows_expr = year_member
@@ -2012,7 +2567,7 @@ def build_mdx(plan: Dict[str, Any], cube_name: str, user_prompt: str = "", schem
                 base_measure_name=primary_measure,
                 agg_intent=agg_intent,
                 where_clause=where_clause,
-                schema=schema
+                schema=safe_schema
             )
             if explicit_agg_mdx:
                 return explicit_agg_mdx
@@ -2021,9 +2576,9 @@ def build_mdx(plan: Dict[str, Any], cube_name: str, user_prompt: str = "", schem
         if listing_support_measure:
             year_member = None
             if year is not None:
-                date_dim, year_attr = _resolve_date_dim_year(dims, schema)
+                date_dim, year_attr = _resolve_date_dim_year(dims, safe_schema)
                 if date_dim and year_attr:
-                    year_member = _member_key(date_dim, year_attr, year, schema)
+                    year_member = _member_key(date_dim, year_attr, year, safe_schema)
             filtered_rows = _build_listing_support_filter(rows_expr, listing_support_measure, year_member)
             mdx = f"SELECT {{}} ON COLUMNS, {filtered_rows} ON ROWS FROM {_br(cube_name)};"
         else:

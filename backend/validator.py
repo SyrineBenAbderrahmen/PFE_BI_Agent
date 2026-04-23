@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Dict, Any, List, Set
+from typing import Dict, Any, List, Optional, Set
+from schema_builder import _norm
+from schema_store import load_schema_snapshot
+from config import settings
+from schema_builder import _norm
 
 
 def _norm_text(s: str) -> str:
@@ -136,6 +140,125 @@ def _resolve_dimension_name(raw_dim: str, catalog: Dict[str, Dict[str, Any]]) ->
             return canonical
 
     return None
+def _valid_dimension_attributes(schema: Optional[Dict[str, Any]], dim_name: str) -> List[str]:
+    if not schema:
+        return []
+
+    for d in schema.get("dimensions", []) or []:
+        current_dim = (d.get("name") or d.get("dimension") or d.get("table") or "").strip()
+        if _norm(current_dim) != _norm(dim_name):
+            continue
+
+        attrs = []
+        raw_attrs = d.get("attributes") or d.get("levels") or []
+        for a in raw_attrs:
+            if isinstance(a, dict):
+                attr_name = (
+                    a.get("name")
+                    or a.get("column")
+                    or a.get("source_column")
+                    or a.get("mdx_name")
+                    or ""
+                ).strip()
+            else:
+                attr_name = str(a).strip()
+
+            if attr_name:
+                attrs.append(attr_name)
+
+        return attrs
+
+    return []
+
+def _is_valid_attr_for_dim(schema: Optional[Dict[str, Any]], dim_name: str, attr_name: str) -> bool:
+    if not schema:
+        return True
+
+    valid_attrs = _valid_dimension_attributes(schema, dim_name)
+    return any(_norm(a) == _norm(attr_name) for a in valid_attrs)
+
+def _looks_like_measure_name(schema: Optional[Dict[str, Any]], name: str) -> bool:
+    if not schema or not name:
+        return False
+
+    for fact in schema.get("facts", []) or []:
+        for m in fact.get("measures", []) or []:
+            m_name = (m.get("name") or "").strip()
+            m_col = (m.get("column") or "").strip()
+            if _norm(m_name) == _norm(name) or _norm(m_col) == _norm(name):
+                return True
+    return False
+
+
+def normalize_plan_measure_facts(plan: dict, schema: dict) -> dict:
+    for m in plan.get("measures", []) or []:
+        if not isinstance(m, dict):
+            continue
+
+        measure_name = (m.get("name") or "").strip()
+        measure_column = (m.get("column") or "").strip()
+
+        resolved_fact = None
+        if measure_column:
+            resolved_fact = _find_fact_for_measure(schema, measure_column)
+        if not resolved_fact and measure_name:
+            resolved_fact = _find_fact_for_measure(schema, measure_name)
+
+        if resolved_fact:
+            m["fact_table"] = resolved_fact
+
+    if not (plan.get("fact_table") or "").strip():
+        for m in plan.get("measures", []) or []:
+            if isinstance(m, dict) and m.get("fact_table"):
+                plan["fact_table"] = m["fact_table"]
+                break
+
+    return plan
+
+
+def normalize_plan_dimensions(plan: dict, schema: dict, user_prompt: str = "") -> dict:
+    cleaned_dims = []
+
+    for d in plan.get("dimensions", []) or []:
+        if not isinstance(d, dict):
+            continue
+
+        dim_name = (d.get("name") or d.get("dimension") or d.get("table") or "").strip()
+        if not dim_name:
+            continue
+
+        attrs = d.get("attributes") or d.get("levels") or []
+        cleaned_attrs = []
+
+        for a in attrs:
+            attr_name = str(a).strip()
+            if not attr_name:
+                continue
+
+            if _looks_like_measure_name(schema, attr_name):
+                continue
+
+            if _is_valid_attr_for_dim(schema, dim_name, attr_name):
+                cleaned_attrs.append(attr_name)
+
+        t = (user_prompt or "").lower()
+        if not cleaned_attrs:
+            if _norm(dim_name) == _norm("DimProduct") and any(x in t for x in ["produit", "produits", "product", "products"]):
+                cleaned_attrs = ["ProductName"]
+            elif _norm(dim_name) == _norm("DimVendor") and any(x in t for x in ["fournisseur", "fournisseurs", "vendor", "vendors"]):
+                cleaned_attrs = ["VendorName"]
+            elif _norm(dim_name) == _norm("DimPurchaseOrder") and any(x in t for x in ["commande", "commandes", "purchase order"]):
+                cleaned_attrs = ["PurchaseOrderID"]
+            elif _norm(dim_name) == _norm("DimDate"):
+                cleaned_attrs = ["YearNumber"]
+
+        new_dim = dict(d)
+        new_dim["attributes"] = cleaned_attrs
+        cleaned_dims.append(new_dim)
+
+    plan["dimensions"] = cleaned_dims
+    return plan
+
 
 
 def _is_valid_attribute_for_dimension(attr: str, dim_name: str, catalog: Dict[str, Dict[str, Any]]) -> bool:
@@ -151,68 +274,98 @@ def _is_valid_attribute_for_dimension(attr: str, dim_name: str, catalog: Dict[st
 
     return False
 
-
-def validate_plan_against_schema(plan: Dict[str, Any], schema: Dict[str, Any]) -> List[str]:
-    errors: List[str] = []
-
-    if not isinstance(plan, dict):
-        return ["Plan must be a JSON object"]
-
-    catalog = _build_dimension_catalog(schema)
-
-    # ===== Dimensions =====
-    for dim in plan.get("dimensions", []) or []:
-        if not isinstance(dim, dict):
+def _measure_exists_in_fact(schema: dict, fact_table: str, measure_name: str) -> bool:
+    for fact in schema.get("facts", []) or []:
+        if (fact.get("name") or "").strip() != (fact_table or "").strip():
             continue
 
-        raw_dim_name = (
-            dim.get("table")
-            or dim.get("name")
-            or dim.get("dimension")
-            or ""
-        ).strip()
+        for m in fact.get("measures", []) or []:
+            m_name = (m.get("name") or "").strip()
+            m_col = (m.get("column") or "").strip()
+            if _norm(m_name) == _norm(measure_name) or _norm(m_col) == _norm(measure_name):
+                return True
 
-        resolved_dim = _resolve_dimension_name(raw_dim_name, catalog)
-        if not resolved_dim:
-            errors.append(f"Unknown dimension in plan: {raw_dim_name}")
+    return False
+
+
+def _find_fact_for_measure(schema: Optional[Dict[str, Any]], measure_name: str) -> str:
+    if not schema or not measure_name:
+        return ""
+
+    matches = []
+    for fact in schema.get("facts", []) or []:
+        fact_name = (fact.get("name") or "").strip()
+        for m in fact.get("measures", []) or []:
+            m_name = (m.get("name") or "").strip()
+            m_col = (m.get("column") or "").strip()
+            if _norm(m_name) == _norm(measure_name) or _norm(m_col) == _norm(measure_name):
+                matches.append(fact_name)
+
+    matches = list(dict.fromkeys(matches))
+    return matches[0] if len(matches) == 1 else ""
+
+def validate_plan_against_schema(plan: dict, schema: dict, user_prompt: str = "") -> list[str]:
+    errors: list[str] = []
+
+    plan = normalize_plan_measure_facts(plan, schema)
+    plan = normalize_plan_dimensions(plan, schema, user_prompt)
+
+    schema_dimensions = {
+        (d.get("name") or d.get("dimension") or d.get("table") or "").strip()
+        for d in schema.get("dimensions", []) or []
+    }
+
+    schema_facts = {
+        (f.get("name") or "").strip()
+        for f in schema.get("facts", []) or []
+    }
+
+    plan_fact_table = (plan.get("fact_table") or "").strip()
+
+    if plan_fact_table and plan_fact_table not in schema_facts:
+        errors.append(f"Unknown fact table in plan: {plan_fact_table}")
+
+    for d in plan.get("dimensions", []) or []:
+        dim_name = (d.get("name") or d.get("dimension") or d.get("table") or "").strip()
+        if dim_name and dim_name not in schema_dimensions:
+            errors.append(f"Unknown dimension in plan: {dim_name}")
             continue
 
-        for attr in dim.get("attributes", []) or []:
-            if not isinstance(attr, str):
-                continue
+        for attr in d.get("attributes", []) or []:
+            if not _is_valid_attr_for_dim(schema, dim_name, attr):
+                errors.append(f"Unknown attribute '{attr}' for dimension '{dim_name}'")
 
-            # on autorise les dimensions sans attributs
-            if attr.strip() and not _is_valid_attribute_for_dimension(attr, resolved_dim, catalog):
-                errors.append(f"Unknown attribute '{attr}' for dimension '{resolved_dim}'")
+    for m in plan.get("measures", []) or []:
+        if not isinstance(m, dict):
+            continue
 
-    # ===== Fact table =====
-    fact_table = (plan.get("fact_table") or "").strip()
-    if fact_table:
-        fact_tables = {
-            (t.get("name") or "").strip()
-            for t in schema.get("tables", []) or []
-            if (t.get("name") or "").strip().startswith("Fact")
-        }
-        if fact_tables and fact_table not in fact_tables:
-            errors.append(f"Unknown fact table in plan: {fact_table}")
+        measure_name = (m.get("column") or m.get("name") or "").strip()
+        if not measure_name:
+            continue
 
-    # ===== Measures =====
-    if fact_table:
-        fact_columns = set()
-        for t in schema.get("tables", []) or []:
-            if (t.get("name") or "").strip() == fact_table:
-                for c in t.get("columns", []) or []:
-                    col_name = (c.get("name") or "").strip()
-                    if col_name:
-                        fact_columns.add(col_name)
-                break
+        measure_fact_table = (m.get("fact_table") or "").strip()
 
-        for m in plan.get("measures", []) or []:
-            if not isinstance(m, dict):
-                continue
+        if not measure_fact_table:
+            resolved_fact = _find_fact_for_measure(schema, measure_name)
+            if resolved_fact:
+                m["fact_table"] = resolved_fact
+                measure_fact_table = resolved_fact
 
-            col = (m.get("column") or "").strip()
-            if col and fact_columns and col not in fact_columns:
-                errors.append(f"Unknown measure column '{col}' in fact table '{fact_table}'")
+        if not measure_fact_table:
+            errors.append(
+                f"Unknown measure column '{measure_name}' in fact table '{plan_fact_table or 'unknown'}'"
+            )
+            continue
+
+        if not _measure_exists_in_fact(schema, measure_fact_table, measure_name):
+            resolved_fact = _find_fact_for_measure(schema, measure_name)
+            if resolved_fact:
+                m["fact_table"] = resolved_fact
+                measure_fact_table = resolved_fact
+
+        if not _measure_exists_in_fact(schema, measure_fact_table, measure_name):
+            errors.append(
+                f"Unknown measure column '{measure_name}' in fact table '{measure_fact_table}'"
+            )
 
     return errors

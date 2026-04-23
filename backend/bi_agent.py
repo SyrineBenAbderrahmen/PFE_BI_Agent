@@ -579,58 +579,6 @@ def _build_schema_for_llm(schema: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _build_schema_for_llm(schema: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Réduit fortement la taille du schéma envoyé au LLM.
-    On garde seulement ce qui est utile pour comprendre :
-    - dimensions
-    - faits / mesures
-    - hiérarchies naturelles
-    On exclut 'tables' car trop volumineux.
-    """
-    compact_dimensions = []
-    for d in schema.get("dimensions", []) or []:
-        compact_dimensions.append({
-            "name": d.get("name"),
-            "attributes": [
-                a.get("name") if isinstance(a, dict) else str(a)
-                for a in (d.get("attributes", []) or [])
-            ],
-        })
-
-    compact_facts = []
-    for f in schema.get("facts", []) or []:
-        compact_facts.append({
-            "name": f.get("name"),
-            "measures": [
-                {
-                    "name": m.get("name"),
-                    "column": m.get("column"),
-                    "agg": m.get("agg"),
-                }
-                for m in (f.get("measures", []) or [])
-            ],
-        })
-
-    compact_hierarchies = {}
-    for dim_name, hier_list in (schema.get("natural_hierarchies", {}) or {}).items():
-        compact_hierarchies[dim_name] = []
-        for h in hier_list or []:
-            compact_hierarchies[dim_name].append({
-                "name": h.get("name"),
-                "levels": [
-                    lvl.get("name") if isinstance(lvl, dict) else str(lvl)
-                    for lvl in (h.get("levels", []) or [])
-                ]
-            })
-
-    return {
-        "dimensions": compact_dimensions,
-        "facts": compact_facts,
-        "natural_hierarchies": compact_hierarchies,
-    }
-
-
 def ask_bi_agent(dw_id: str, user_prompt: str) -> Dict[str, Any]:
     dw = get_dw_cfg(dw_id)
     if not dw:
@@ -714,7 +662,7 @@ SCHEMA SNAPSHOT:
         plan["mdx"] = " ".join(plan["mdx"].split())
         plan["mdx"] = auto_fix_mdx_generic(plan["mdx"], user_prompt, schema)
 
-    errors = validate_plan_against_schema(plan, schema)
+    errors = validate_plan_against_schema(plan, schema,user_prompt)
     if errors:
         return {
             "status": "error",

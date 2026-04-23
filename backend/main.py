@@ -18,7 +18,7 @@ from schema_builder import build_dw_schema_snapshot
 from history_store import save_prompt_history, get_prompt_history
 
 from bi_agent import ask_bi_agent
-from mdx_builder import build_mdx, analyze_prompt_guidance
+from mdx_builder import build_mdx, analyze_prompt_guidance 
 
 from cube_mutations import add_measure_to_cube, modify_dimension_in_cube
 from intent_parser import parse_intent
@@ -29,6 +29,7 @@ from models import (
     CubeModel,
     SchemaSnapshot,
 )
+from validator import validate_plan_against_schema
 from cube_designer import create_cube_model, cube_model_from_registry
 from cube_validator import validate_cube_model
 from cube_store import save_cube_record, load_cube_record, cube_exists
@@ -221,7 +222,7 @@ def agent_prompt(req: PromptRequest):
 
         return response_data
 
-    plan = ask_bi_agent(req.dw, req.prompt)
+    plan = ask_bi_agent(req.dw, req.prompt )
 
     if plan.get("status") == "error":
         try:
@@ -243,6 +244,20 @@ def agent_prompt(req: PromptRequest):
             "status": "error",
             "message": plan.get("message", "Unknown agent error"),
             "guidance": guidance
+        }
+
+    # IMPORTANT : validation avec user_prompt
+    errors = validate_plan_against_schema(plan, schema_for_use, req.prompt)
+    if errors:
+        return {
+            "status": "error",
+            "workspace_mode": "query",
+            "dw_id": req.dw,
+            "message": f"Plan invalid against DW schema snapshot: {errors[0]}",
+            "generation": {
+                "mdx_generated": False,
+                "xmla_generated": False
+            }
         }
 
     cube_name = dw_cfg["cube_name"]
@@ -307,6 +322,11 @@ def mdx_raw(req: PromptRequest):
     plan = ask_bi_agent(req.dw, req.prompt)
     if plan.get("status") == "error":
         return str(plan)
+
+    # IMPORTANT : validation avec user_prompt
+    errors = validate_plan_against_schema(plan, schema_for_use, req.prompt)
+    if errors:
+        return f"Plan invalid against DW schema snapshot: {errors[0]}"
 
     cube_name = dw_cfg["cube_name"]
     mdx = build_mdx(
